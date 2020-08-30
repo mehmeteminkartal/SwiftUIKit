@@ -36,6 +36,7 @@ public struct CurrencyTextField: UIViewRepresentable {
     
     @Environment(\.layoutDirection) private var layoutDirection: LayoutDirection
     @Environment(\.font) private var swiftUIfont: Font?
+    @Environment(\.locale) private var locale: Locale
     
     public init(
         _ placeholder: String = "",
@@ -162,13 +163,18 @@ public struct CurrencyTextField: UIViewRepresentable {
     }
     
     public func makeCoordinator() -> CurrencyTextField.Coordinator {
-        Coordinator(value: $value, isResponder: self.isResponder, onReturn: self.onReturn){ flag in
+        Coordinator(value: $value, locale: self.locale, isResponder: self.isResponder, onReturn: self.onReturn) { flag in
             self.onEditingChanged(flag)
         }
     }
     
     public func updateUIView(_ textField: UITextField, context: UIViewRepresentableContext<CurrencyTextField>) {
-        
+
+        if self.locale != context.coordinator.locale {
+            context.coordinator.locale = self.locale
+            context.coordinator.internalValue = nil // Force update to reflect changes to textview
+        }
+
         // value
         if self.value != context.coordinator.internalValue {
             if self.value == nil {
@@ -201,10 +207,12 @@ public struct CurrencyTextField: UIViewRepresentable {
         var internalValue: Double?
         var onEditingChanged: (Bool)->()
         var didBecomeFirstResponder = false
+        var locale: Locale
         
-        init(value: Binding<Double?>, isResponder: Binding<Bool>?, onReturn: @escaping () -> Void = {}, onEditingChanged: @escaping (Bool) -> Void = { _ in }) {
+        init(value: Binding<Double?>, locale: Locale, isResponder: Binding<Bool>?, onReturn: @escaping () -> Void = {}, onEditingChanged: @escaping (Bool) -> Void = { _ in }) {
             print("coordinator init")
             _value = value
+            self.locale = locale
             internalValue = value.wrappedValue
             self.isResponder = isResponder
             self.onReturn = onReturn
@@ -216,7 +224,7 @@ public struct CurrencyTextField: UIViewRepresentable {
             let originalText = textField.text
             let text = textField.text as NSString?
             let newValue = text?.replacingCharacters(in: range, with: string)
-            let display = newValue?.currencyFormat
+            let display = newValue?.currencyFormat(with: self.locale)
             
             // validate change
             if !shouldAllowChange(oldValue: textField.text ?? "", newValue: newValue ?? "") {
@@ -359,7 +367,7 @@ fileprivate extension String {
         return Double(decimals) ?? 0
     }
     
-    var currencyFormat: String? {
+    func currencyFormat(with locale: Locale) -> String? {
         // uses self.double
         // logic for varying the number of fraction digits
         
@@ -368,6 +376,7 @@ fileprivate extension String {
         }
         
         let formatter = Formatter.currency
+        formatter.locale = locale
         let fractionDigits = fractions?.count ?? 0
         // if has fractions, show fractions
         if fractions != nil {
