@@ -377,6 +377,9 @@ fileprivate extension String {
         
         let formatter = Formatter.currency
         formatter.locale = locale
+        formatter.decimalSeparator = "."
+        formatter.groupingSeparator = ","
+        
         let fractionDigits = fractions?.count ?? 0
         // if has fractions, show fractions
         if fractions != nil {
